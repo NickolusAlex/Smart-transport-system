@@ -1,32 +1,59 @@
- #include <SoftwareSerial.h>
+#include <SoftwareSerial.h>
+#include <TinyGPS++.h>
 
+SoftwareSerial serial_connection(10, 11); //RX=pin 10, TX=pin 11
+TinyGPSPlus gps;//This is the GPS object that will pretty much do all the grunt work with the NMEA data
 SoftwareSerial mySerial(9, 10);
 
 void setup()
 {
   mySerial.begin(9600);   // Setting the baud rate of GSM Module  
   Serial.begin(9600);    // Setting the baud rate of Serial Monitor (Arduino)
+  serial_connection.begin(9600);//This opens up communications to the GPS
+  Serial.println("GPS Start");//Just show to the monitor that the sketch has started
+
   delay(100);
 }
 
 
 void loop()
 {
+ while(serial_connection.available())//While there are characters to come from the GPS
+  {
+    gps.encode(serial_connection.read());//This feeds the serial NMEA data into the library one char at a time
+  }
+  if(gps.location.isUpdated())//This will pretty much be fired all the time anyway but will at least reduce it to only after a package of NMEA data comes in
+  {
+    //Get the latest info from the gps object which it derived from the data sent by the GPS unit
+    Serial.println("Satellite Count:");
+    Serial.println(gps.satellites.value());
+    Serial.println("Latitude:");
+    Serial.println(gps.location.lat(), 6);
+    Serial.println("Longitude:");
+    Serial.println(gps.location.lng(), 6);
+    Serial.println("Speed MPH:");
+    Serial.println(gps.speed.mph());
+    Serial.println("Altitude Feet:");
+    Serial.println(gps.altitude.feet());
+    Serial.println("");
+  }
+
+
   if (Serial.available()>0)
-      SendMessage();
+      SendMessage(gps.location.lat(),gps.location.lng());
      
  if (mySerial.available()>0)
    Serial.write(mySerial.read());
 }
 
 
- void SendMessage()
+ void SendMessage(float lat,float long)
 {
   mySerial.println("AT+CMGF=1");    //Sets the GSM Module in Text Mode
   delay(1000);  // Delay of 1000 milli seconds or 1 second
   mySerial.println("AT+CMGS=\"+91xxxxxxxxxx\"\r"); // Replace x with mobile number
   delay(1000);
-  mySerial.println("I am SMS from GSM Module");// The SMS text you want to send
+  mySerial.println(lat,long);// The SMS text you want to send
   delay(100);
    mySerial.println((char)26);// ASCII code of CTRL+Z
   delay(1000);
